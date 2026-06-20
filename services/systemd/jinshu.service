@@ -1,13 +1,14 @@
 [Unit]
-Description=Ji Graph-Vector Database Server Engine
+Description=Jinshu Cognitive Graph-Vector Database Server Engine
 After=network.target
 
 [Service]
 Type=simple
 
-# %h est le raccourci Systemd pour le répertoire Home de l'utilisateur actuel
+# Répertoire de travail temporaire pour l'exécution
 WorkingDirectory=/tmp
-ExecStart=ji serve
+# Appel du nouvel exécutable officiel
+ExecStart=jinshu serve
 # Redémarrage automatique si le serveur crash
 Restart=on-failure
 RestartSec=3s
