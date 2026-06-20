@@ -1,0 +1,18 @@
+#!/bin/sh
+
+# PROVIDE: ji
+# REQUIRE: NETWORKING
+# KEYWORD: shutdown
+
+. /etc/rc.subr
+
+name="ji"
+rcvar="ji_enable"
+
+# Commande et dossier d'exécution
+command="/usr/local/bin/${name}"
+command_args="serve &"
+ji_chdir="/tmp"
+
+load_rc_config $name
+run_rc_command "$1"

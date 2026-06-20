@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>ji</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
+  <style>
+    body {
+      background-color: #000;
+      color: #fff;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      overflow: hidden;
+    }
+
+    #control-bar {
+      padding: 12px 20px;
+      background: #000;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      flex-wrap: wrap;
+    }
+
+    .title {
+      font-weight: bold;
+      color: lightsalmon;
+      font-size: 14pt;
+      margin-right: 20px;
+    }
+
+    label {
+      font-size: 10pt;
+      color: #aaaaaa;
+    }
+
+    select {
+      background: #000;
+      color: lightsalmon;
+      padding: 6px 12px;
+      cursor: pointer;
+    }
+
+    select:focus,
+    input:focus {
+      border-color: lightsalmon;
+      outline: none;
+    }
+
+    .hide {
+      display: hidden;
+    }
+
+    /* Barre de recherche adaptative */
+    .search-box {
+      background: #000;
+      color: lightsalmon;
+      padding: 6px 12px;
+      width: 400px;
+      font-size: 10pt;
+      transition: all 0.3s ease;
+    }
+
+    .search-box::placeholder {
+      color: darksalmon;
+      font-style: italic;
+    }
+
+    #cy {
+      width: 100vw;
+      height: calc(100vh - 60px);
+      display: block;
+      background-color: #000;
+    }
+
+    #loading {
+      position: absolute;
+      top: 70px;
+      right: 20px;
+      background: rgba(0, 202, 78, 0.2);
+      border: 1px solid #00ca4e;
+      padding: 8px 15px;
+      border-radius: 4px;
+      display: none;
+      font-size: 10pt;
+      z-index: 999;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div id="control-bar">
+    <label for="db-select">Bases :</label>
+    <select id="db-select" onchange="updateEnvironments()"></select>
+
+    <label for="env-select">Environements :</label>
+    <select id="env-select" onchange="loadGraph()"></select>
+
+    <input type="text" id="search-input" class="search-box" placeholder="Analyse de la base..." oninput="filterGraph()">
+    <button
+      style="background: lightsalmon; color: black; border: none; padding: 6px 15px; border-radius: 4px; font-weight: bold; cursor: pointer; margin-left: auto;"
+      id="new-db">+</button>
+    <button onclick="loadGraph()"
+      style="background: lightsalmon; color: black; border: none; padding: 6px 15px; border-radius: 4px; font-weight: bold; cursor: pointer; margin-left: auto;">Actualiser</button>
+  </div>
+
+  <div id="loading">Loading...</div>
+  <div id="cy"></div>
+
+  <script src="https://code.jquery.com/jquery-4.0.0.min.js"
+    integrity="sha256-OaVG6prZf4v69dPg6PhVattBXkcOWQB62pdZ3ORyrao=" crossorigin="anonymous"></script>
+
+
+  <script>
+    $(document).ready(function () {
+      $("#new-db").click(function (e) {
+        e.preventDefault();
+        if ($(this).val() == "+") {
+          $(this).text("-");
+        } else {
+          $(this).text("+");
+
+        }
+      })
+    });
+  </script>
+
+  <script>
+    let dbData = [];
+    let cyInstance = null;
+
+    // 1. Initialisation des menus déroulants au chargement
+    document.addEventListener("DOMContentLoaded", () => {
+      fetch('/api/databases')
+        .then(res => res.json())
+        .then(data => {
+          dbData = data;
+          const dbSelect = document.getElementById('db-select');
+          dbSelect.innerHTML = '';
+
+          dbData.forEach(item => {
+            let opt = document.createElement('option');
+            opt.value = item.db_name;
+            opt.innerText = item.db_name.toUpperCase();
+            dbSelect.appendChild(opt);
+          });
+
+          if (dbData.length > 0) {
+            updateEnvironments();
+          }
+        });
+    });
+
+    function updateEnvironments() {
+      const dbSelect = document.getElementById('db-select').value;
+      const envSelect = document.getElementById('env-select');
+      envSelect.innerHTML = '';
+
+      const selectedDb = dbData.find(x => x.db_name === dbSelect);
+      if (selectedDb && selectedDb.environments.length > 0) {
+        selectedDb.environments.forEach(env => {
+          let opt = document.createElement('option');
+          opt.value = env;
+          opt.innerText = env;
+          envSelect.appendChild(opt);
+        });
+      }
+      loadGraph();
+    }
+
+    function loadNewDbForm() {
+      $("#new-db").click(function (e) {
+        e.preventDefault();
+        alert("d");
+      });
+      const btn_form = document.getElementById('new-db');
+      const form = document.getElementById('new-db-form');
+      form.style.display = "block";
+      btn_form.form.value = "-";
+    }
+    // 2. Chargement des données et Introspection de la structure
+    function loadGraph() {
+      const db = document.getElementById('db-select').value;
+      const env = document.getElementById('env-select').value;
+      const loader = document.getElementById('loading');
+      const searchInput = document.getElementById('search-input');
+
+      searchInput.value = '';
+
+      if (!db || !env) return;
+      loader.style.display = 'block';
+
+      fetch(`/api/graph?db=${db}&env=${env}`)
+        .then(res => res.json())
+        .then(data => {
+          loader.style.display = 'none';
+          if (data.error || !data.nodes) return;
+
+          // ALGORITHME D'INTROSPECTION DE LA BASE DE DONNÉES
+          // On collecte toutes les clés uniques de propriétés présentes dans les nœuds
+          let propertyKeys = new Set();
+          data.nodes.forEach(node => {
+            if (node.data) {
+              Object.keys(node.data).forEach(key => {
+                // On ignore les champs techniques internes de Cytoscape
+                if (key !== 'id' && key !== 'label' && node.data[key]) {
+                  propertyKeys.add(key);
+                }
+              });
+            }
+          });
+
+          // On construit le placeholder personnalisé basé sur les vrais records
+          if (propertyKeys.size > 0) {
+            const exemples = Array.from(propertyKeys)
+              .map(k => k.charAt(0).toUpperCase() + k.slice(1)) // Majuscule
+              .slice(0, 3) // On prend max 3 exemples
+              .join(', ');
+            searchInput.placeholder = `🔍 Filtrer par ${exemples}...`;
+          } else {
+            searchInput.placeholder = "🔍 Rechercher un enregistrement...";
+          }
+
+          // Initialisation de Cytoscape
+          if (cyInstance) {cyInstance.destroy();}
+
+          cyInstance = cytoscape({
+            container: document.getElementById('cy'),
+            elements: [...data.nodes, ...data.edges],
+            style: [
+              {
+                selector: 'node',
+                style: {
+                  'background-color': 'white',
+                  'label': 'data(nom)', // S'il n'y a pas de nom, Cytoscape affichera l'ID par fallback
+                  'color': '#ffffff',
+                  'font-size': '11px',
+                  'text-valign': 'center',
+                  'text-halign': 'right',
+                  'text-margin-x': 8,
+                  'width': '20px',
+                  'height': '20px',
+                }
+              },
+              {
+                selector: 'edge',
+                style: {
+                  'width': 2,
+                  'line-color': 'darksalmon',
+                  'target-arrow-color': 'darksalmon',
+                  'target-arrow-shape': 'triangle',
+                  'curve-style': 'bezier',
+                  'label': 'data(label)',
+                  'color': 'lightsalmon',
+                  'text-margin-x': 8,
+                  'text-margin-y': 8,
+                  'font-size': '11px',
+                  'text-rotation': 'autorotate'
+                }
+              },
+              {selector: '.faded', style: {'opacity': 0.15, 'background-color': '#111', 'line-color': '#333'}},
+              {selector: '.highlighted', style: {'background-color': 'white', 'width': '30px', 'height': '30px'}}
+            ],
+            layout: {
+              name: 'cose',
+              animate: true,               // Active l'animation de déploiement fluide
+              animationDuration: 800,      // Durée du déploiement en ms
+              refresh: 20,                 // Fréquence de rafraîchissement des forces pendant le calcul
+
+              // 🎯 PARAMÈTRES D'ESPACEMENT MAJEURS
+              nodeRepulsion: function (node) {return 8000000;}, // ÉNORME augmentation de la force de répulsion (par défaut ~400000)
+              idealEdgeLength: function (edge) {return 180;},   // Longueur idéale des lignes TGV / Relations (par défaut ~10; augmenté à 180px)
+              edgeElasticity: function (edge) {return 100;},    // Rigidité des liaisons (plus c'est bas, plus le ressort se détend)
+              nodeOverlap: 20,             // Espace minimum d'évitement des collisions entre nœuds proches
+
+              // 🌌 AJUSTEMENTS DE GRAVITÉ (Empêche l'effet "trou noir" central)
+              gravity: 0.1,                // Force d'attraction vers le centre de l'écran (baissée pour laisser le graphe s'étaler)
+              numIter: 1500,               // Nombre d'itérations maximum pour affiner le calcul du placement
+              initialTemp: 1000,           // Température initiale du modèle physique (plus elle est haute, plus les points s'écartent vite au début)
+              coolingFactor: 0.99,         // Vitesse de stabilisation du graphe
+
+              fit: true,                   // Recadre automatiquement le graphe pour qu'il tienne entièrement dans la fenêtre
+              padding: 50                  // Marge de sécurité de 50px sur les bords de ton écran
+            }
+          });
+        });
+    }
+
+    // 3. Filtrage dynamique polymorphe
+    function filterGraph() {
+      if (!cyInstance) return;
+      const query = document.getElementById('search-input').value.toLowerCase().trim();
+
+      if (query === "") {
+        cyInstance.elements().removeClass('faded highlighted');
+        return;
+      }
+
+      cyInstance.elements().each(element => {
+        let isMatch = false;
+
+        if (element.isNode()) {
+          // Recherche dynamique : on scanne TOUTES les propriétés du nœud, peu importe leur nom !
+          const fields = Object.values(element.data());
+          isMatch = fields.some(field =>
+            String(field).toLowerCase().includes(query)
+          );
+        } else if (element.isEdge()) {
+          const edgeLabel = (element.data('label') || "").toLowerCase();
+          if (edgeLabel.includes(query)) isMatch = true;
+        }
+
+        if (isMatch) {
+          element.removeClass('faded');
+          if (element.isNode()) element.addClass('highlighted');
+        } else {
+          element.removeClass('highlighted');
+          element.addClass('faded');
+        }
+      });
+    }
+  </script>
+</body>
+
+</html>

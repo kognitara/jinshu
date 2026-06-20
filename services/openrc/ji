@@ -1,0 +1,17 @@
+#!/sbin/openrc-run
+
+description="Ji Graph-Vector Database Server Engine"
+
+# Chemin vers l'exécutable de ji (à adapter selon l'emplacement réel, ex: /usr/local/bin/ji)
+command="/usr/local/bin/ji"
+command_args="serve"
+command_background="yes"
+
+# Équivalent de WorkingDirectory=/tmp et Restart=on-failure
+directory="/tmp"
+pidfile="/run/${RC_SVCNAME}.pid"
+retry="respawn"
+
+depend() {
+    need net
+}

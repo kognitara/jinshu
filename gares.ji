@@ -1,0 +1,62 @@
+# =================================================================
+# ENREGISTREMENTS RÉSEAU TGV FRANCE 2026 - COMPATIBLE PARSER JI
+# =================================================================
+
+# --- 1. LES NŒUDS : LES GARES (20 Records) ---
+ADD (G_PARIS_LYON:Gare {nom: "Paris_Gare_de_Lyon", ville: "Paris", hub: "Oui"})
+ADD (G_PARIS_MONTP:Gare {nom: "Paris_Montparnasse", ville: "Paris", hub: "Oui"})
+ADD (G_PARIS_EST:Gare {nom: "Paris_Est", ville: "Paris", hub: "Oui"})
+ADD (G_PARIS_NORD:Gare {nom: "Paris_Nord", ville: "Paris", hub: "Oui"})
+ADD (G_LYON_PART:Gare {nom: "Lyon_Part_Dieu", ville: "Lyon", hub: "Oui"})
+ADD (G_MARSEILLE:Gare {nom: "Marseille_Saint_Charles", ville: "Marseille", hub: "Oui"})
+ADD (G_LILLE_EUR:Gare {nom: "Lille_Europe", ville: "Lille", hub: "Oui"})
+ADD (G_BORDEAUX:Gare {nom: "Bordeaux_Saint_Jean", ville: "Bordeaux", hub: "Oui"})
+ADD (G_STRASBOURG:Gare {nom: "Strasbourg_Ville", ville: "Strasbourg", hub: "Oui"})
+ADD (G_NANTES:Gare {nom: "Nantes", ville: "Nantes", hub: "Non"})
+ADD (G_RENNES:Gare {nom: "Rennes", ville: "Rennes", hub: "Non"})
+ADD (G_NICE:Gare {nom: "Nice_Ville", ville: "Nice", hub: "Non"})
+ADD (G_TOULOUSE:Gare {nom: "Toulouse_Matabiau", ville: "Toulouse", hub: "Non"})
+ADD (G_MONTPELLIER:Gare {nom: "Montpellier_Sud_de_France", ville: "Montpellier", hub: "Non"})
+ADD (G_NANCY:Gare {nom: "Nancy_Ville", ville: "Nancy", hub: "Non"})
+ADD (G_METZ:Gare {nom: "Metz_Ville", ville: "Metz", hub: "Non"})
+ADD (G_TOURS:Gare {nom: "Saint_Pierre_des_Corps", ville: "Tours", hub: "Non"})
+ADD (G_LE_MANS:Gare {nom: "Le_Mans", ville: "Le_Mans", hub: "Non"})
+ADD (G_REIMS:Gare {nom: "Champagne_Ardenne_TGV", ville: "Reims", hub: "Non"})
+ADD (G_AVIGNON:Gare {nom: "Avignon_TGV", ville: "Avignon", hub: "Non"})
+
+# --- 2. LES ARÊTES : LES LIGNES (30 Records) ---
+ADD (G_PARIS_LYON)-[LGV_SUD_EST]->(G_LYON_PART)
+ADD (G_LYON_PART)-[LGV_SUD_EST]->(G_PARIS_LYON)
+ADD (G_LYON_PART)-[LGV_MEDITERRANEE]->(G_AVIGNON)
+ADD (G_AVIGNON)-[LGV_MEDITERRANEE]->(G_MARSEILLE)
+ADD (G_MARSEILLE)-[LIGNE_CLASSIQUE]->(G_NICE)
+ADD (G_AVIGNON)-[CONTOURNEMENT]->(G_MONTPELLIER)
+
+ADD (G_PARIS_MONTP)-[LGV_ATLANTIQUE]->(G_LE_MANS)
+ADD (G_LE_MANS)-[LGV_BRETAGNE]->(G_RENNES)
+ADD (G_LE_MANS)-[LIGNE_CLASSIQUE]->(G_NANTES)
+ADD (G_PARIS_MONTP)-[LGV_ATLANTIQUE]->(G_TOURS)
+ADD (G_TOURS)-[LGV_SEA]->(G_BORDEAUX)
+ADD (G_BORDEAUX)-[LIGNE_CLASSIQUE]->(G_TOULOUSE)
+
+ADD (G_PARIS_EST)-[LGV_EST]->(G_REIMS)
+ADD (G_REIMS)-[LGV_EST]->(G_METZ)
+ADD (G_REIMS)-[LGV_EST]->(G_NANCY)
+ADD (G_REIMS)-[LGV_EST]->(G_STRASBOURG)
+ADD (G_STRASBOURG)-[LGV_EST]->(G_PARIS_EST)
+
+ADD (G_PARIS_NORD)-[LGV_NORD]->(G_LILLE_EUR)
+ADD (G_LILLE_EUR)-[LGV_NORD]->(G_PARIS_NORD)
+
+ADD (G_LILLE_EUR)-[INTERCONNEXION_EST]->(G_REIMS)
+ADD (G_LILLE_EUR)-[INTERCONNEXION_SUD]->(G_LYON_PART)
+ADD (G_STRASBOURG)-[LGV_RHIN_RHONE]->(G_LYON_PART)
+ADD (G_BORDEAUX)-[INTER_SECTEUR]->(G_STRASBOURG)
+ADD (G_NANTES)-[INTER_SECTEUR]->(G_LYON_PART)
+ADD (G_RENNES)-[INTER_SECTEUR]->(G_LYON_PART)
+ADD (G_BORDEAUX)-[INTER_SECTEUR]->(G_LYON_PART)
+
+ADD (G_BORDEAUX)-[LGV_SEA]->(G_TOURS)
+ADD (G_RENNES)-[LGV_BRETAGNE]->(G_LE_MANS)
+ADD (G_MONTPELLIER)-[CONTOURNEMENT]->(G_AVIGNON)
+ADD (G_NICE)-[LIGNE_CLASSIQUE]->(G_MARSEILLE)

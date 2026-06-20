@@ -1,0 +1,20 @@
+[Unit]
+Description=Ji Graph-Vector Database Server Engine
+After=network.target
+
+[Service]
+Type=simple
+
+# %h est le raccourci Systemd pour le répertoire Home de l'utilisateur actuel
+WorkingDirectory=/tmp
+ExecStart=ji serve
+# Redémarrage automatique si le serveur crash
+Restart=on-failure
+RestartSec=3s
+
+# Force la sortie standard directement dans le journal pour journalctl
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target
