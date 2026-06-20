@@ -1,8 +1,13 @@
 [package]
-name = "ji"
+name = "jinshu"
 version = "0.1.0"
 edition = "2024"
-
+description = "A secure, immutable, goal-oriented cognitive graph database."
+license =  "AGPL-3.0"
+readme = "README.md"
+keywords = ["base"]
+categories = ["command-line-utilities"]
+repository = "https://github.com/kognitara/jinshu"
 [dependencies]
 anyhow = "1.0.102"
 bincode = "1.3.3"
