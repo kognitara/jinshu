@@ -41,6 +41,7 @@ pub struct NodeData {
 pub struct EdgeData {
     pub target_id: String,
     pub relation_name: String,
+    pub properties: HashMap<String, String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -659,14 +660,45 @@ impl GraphStore {
     }
 
     /// Connecte deux nœuds existants via une arête relationnelle
-    pub fn add_edge(&mut self, source_id: String, target_id: String, relation_name: String) {
+    pub fn add_edge(
+        &mut self,
+        source_id: String,
+        target_id: String,
+        relation_name: String,
+        properties: HashMap<String, String>,
+    ) {
         let edge = EdgeData {
             target_id,
             relation_name,
+            properties,
         };
         self.edges
             .entry(source_id)
             .or_insert_with(Vec::new)
             .push(edge);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_add_edge_with_properties() {
+        let mut store = GraphStore::new(); // Adapte selon ton constructeur
+        let mut props = HashMap::new();
+        props.insert("vitesse_max".to_string(), "320".to_string());
+
+        store.add_edge(
+            "Paris".to_string(),
+            "Lyon".to_string(),
+            "LGV".to_string(),
+            props,
+        );
+
+        // On vérifie que l'arête existe et contient la propriété
+        let edges = store.edges.get("Paris").unwrap();
+        assert_eq!(edges[0].target_id, "Lyon");
+        assert_eq!(edges[0].properties.get("vitesse_max").unwrap(), "320");
     }
 }

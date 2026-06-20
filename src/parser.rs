@@ -53,20 +53,26 @@ impl Parser {
             )),
         }
     }
-    /// Extrait une seule commande complète en consommant son mot-clé d'initiation
     fn parse_add_command(&mut self) -> Result<Command, String> {
-        // 1. On parse le premier nœud (qui est soit le nœud à créer, soit la source de la relation)
+        // 1. On parse le premier nœud
         let first_node = self.parse_node()?;
 
         // 2. Est-ce qu'il y a une flèche après ?
         if self.peek_token() == Some(&Token::StartEdge) {
             self.consume_token(); // Consomme le '-['
 
-            // On extrait le nom de la relation, ex: "connexion"
+            // On extrait le nom de la relation, ex: "LGV_SUD_EST"
             let edge_name = match self.consume_token() {
                 Some(Token::Ident(name)) => name,
                 _ => return Err("Nom de relation manquant dans le ADD".to_string()),
             };
+
+            // COLLÈGUE : On ajoute la détection des propriétés de l'arête ici !
+            let mut edge_properties = Vec::new();
+            if self.peek_token() == Some(&Token::OpenBrace) {
+                self.consume_token(); // Mange le '{'
+                edge_properties = self.parse_properties()?; // Réutilise ton super analyseur
+            }
 
             // On ferme l'arête avec ']->'
             if self.consume_token() != Some(Token::Arrow) {
@@ -76,14 +82,15 @@ impl Parser {
             // On parse le nœud cible, ex: (destination)
             let target_node = self.parse_node()?;
 
-            // On retourne l'expression d'arête complète
+            // On retourne l'expression d'arête complète avec ses propriétés
             Ok(Command::Add(crate::ast::AddExpression::Edge {
                 source: first_node.alias,
                 target: target_node.alias,
                 name: edge_name,
+                properties: edge_properties, // ◄ Injecté proprement !
             }))
         } else {
-            // Pas de flèche ? C'était juste la création d'un nœud isolé !
+            // Pas de flèche ? Création d'un nœud isolé
             Ok(Command::Add(crate::ast::AddExpression::Node(first_node)))
         }
     }
@@ -289,5 +296,61 @@ impl Parser {
         } else {
             None
         }
+    }
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ast::{AddExpression, Command};
+    use crate::token::Token; // Adapte selon ton architecture
+
+    #[test]
+    fn test_parse_isolated_node_with_label_and_props() {
+        // Simule les tokens pour : (G_PARIS:Gare {ville: "Paris"})
+        let tokens = vec![
+            Token::Add,
+            Token::OpenParen,
+            Token::Ident("G_PARIS".to_string()),
+            Token::Colon,
+            Token::Ident("Gare".to_string()),
+            Token::OpenBrace,
+            Token::Ident("ville".to_string()),
+            Token::Colon,
+            Token::Str("Paris".to_string()),
+            Token::CloseBrace,
+            Token::CloseParen,
+        ];
+
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse_program().unwrap();
+
+        assert_eq!(program.commands.len(), 1);
+        if let Command::Add(AddExpression::Node(node)) = &program.commands[0] {
+            assert_eq!(node.alias, "G_PARIS");
+            assert_eq!(node.label, Some("Gare".to_string()));
+            assert_eq!(node.properties_filters[0].key_id, "ville");
+            assert_eq!(node.properties_filters[0].target_value_id, "Paris");
+        } else {
+            panic!("La commande aurait dû être un Add Expression d'un Nœud");
+        }
+    }
+
+    #[test]
+    fn test_parse_syntax_error_missing_paren() {
+        // Simule un oubli de parenthèse : ADD (G_PARIS:Gare
+        let tokens = vec![
+            Token::Add,
+            Token::OpenParen,
+            Token::Ident("G_PARIS".to_string()),
+            Token::Colon,
+            Token::Ident("Gare".to_string()),
+        ];
+
+        let mut parser = Parser::new(tokens);
+        let result = parser.parse_program();
+        assert!(
+            result.is_err(),
+            "Le parseur aurait dû lever une erreur de syntaxe"
+        );
     }
 }

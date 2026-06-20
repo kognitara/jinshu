@@ -34,11 +34,19 @@ impl CodeGenerator {
                         source,
                         target,
                         name,
+                        properties,
                     } => {
+                        let mut edge_props = HashMap::new();
+                        for filter in properties {
+                            edge_props.insert(filter.key_id, filter.target_value_id);
+                        }
+
+                        // 2. On passe la map à l'OpCode
                         self.bytecode.push(OpCode::CreateEdge {
                             source,
                             target,
                             name,
+                            properties: edge_props, // Avant, ce champ manquait dans ton OpCode !
                         });
                     }
                 },

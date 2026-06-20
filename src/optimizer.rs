@@ -1,4 +1,4 @@
-use crate::ast::{Command, ExecutionMode, Program, VectorFilter};
+use crate::ast::{Command, ExecutionMode, Program};
 
 pub struct QueryOptimizer {
     pub default_mode: ExecutionMode,

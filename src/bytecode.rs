@@ -24,6 +24,7 @@ pub enum OpCode {
         source: String,
         target: String,
         name: String,
+        properties: HashMap<String, String>,
     },
     GpuVectorFilter {
         target: String,

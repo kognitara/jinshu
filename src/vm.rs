@@ -214,13 +214,18 @@ impl VirtualMachine {
                     source,
                     target,
                     name,
+                    properties,
                 } => {
                     println!(
                         "{GREEN} {RESET} Modifying storage: Connecting « {source} » -[{name}]-> « {target} »",
                     );
                     // Injection directe et persistance dans le store binaire
-                    self.store
-                        .add_edge(source.clone(), target.clone(), name.clone());
+                    self.store.add_edge(
+                        source.clone(),
+                        target.clone(),
+                        name.clone(),
+                        properties.clone(),
+                    );
                 }
                 OpCode::GpuVectorFilter {
                     target: _,

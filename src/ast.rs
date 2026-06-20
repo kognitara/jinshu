@@ -72,5 +72,6 @@ pub enum AddExpression {
         source: String,
         target: String,
         name: String,
+        properties: Vec<PropertyFilter>,
     },
 }
