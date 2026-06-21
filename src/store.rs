@@ -21,7 +21,7 @@ pub const USB_STORAGE: &str = "/run/media/%user%/JI";
 /// Signature binaire de niveau militaire pour valider l'authenticité du fichier .ji ("JIDB")
 const MAGIC_NUMBER: [u8; 4] = [0x4A, 0x49, 0x44, 0x42];
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 struct DeployTarget {
     name: String,
     ip: String,
@@ -29,7 +29,7 @@ struct DeployTarget {
     remote_dir: String,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 struct DeployConfig {
     targets: Vec<DeployTarget>,
 }
@@ -55,6 +55,40 @@ pub struct GraphStore {
     pub edges: HashMap<String, Vec<EdgeData>>,
 }
 
+/// Génère et sauvegarde le fichier 'deploy.yml' à l'emplacement attendu par le moteur de déploiement
+pub fn init_deploy_config() -> Result<(), String> {
+    // 1. On prépare nos serveurs cibles
+    let servers = vec![
+        DeployTarget {
+            name: "Serveur-Principal-Est".to_string(),
+            ip: "192.168.1.50".to_string(),
+            user: "shirusu".to_string(),
+            remote_dir: "/home/shirusu/jinshu_cluster".to_string(),
+        },
+        DeployTarget {
+            name: "Serveur-Backup-Nord".to_string(),
+            ip: "10.0.4.12".to_string(),
+            user: "root".to_string(),
+            remote_dir: "/opt/jinshu_backup".to_string(),
+        },
+    ];
+    let config = DeployConfig { targets: servers };
+    let yaml_content = serde_yaml::to_string(&config)
+        .map_err(|e| format!("Échec de la sérialisation en YAML : {}", e))?;
+    let home = std::env::var("HOME").expect("not unix");
+    // 2. Écriture sécurisée sur le disque
+
+    let mut config_path = LOCAL_STORAGE.replace("%home%", &home);
+    config_path.push_str("/deploy.yml");
+    fs::write(&config_path, yaml_content)
+        .map_err(|e| format!("Impossible d'écrire le fichier deploy.yml : {}", e))?;
+
+    println!(
+        "{GREEN} ✓{RESET} Configuration de déploiement initialisée avec succès à l'emplacement : {config_path}",
+    );
+
+    Ok(())
+}
 impl GraphStore {
     /// Initialise un stockage de graphe vide en mémoire
     pub fn new() -> Self {
@@ -63,6 +97,7 @@ impl GraphStore {
             edges: HashMap::new(),
         }
     }
+
     pub fn atomic_save(&self, path: &Path) -> Result<(), DatabaseError> {
         // 1. Définir le chemin temporaire
         let tmp_path = path.with_extension("ji.tmp");
@@ -80,6 +115,7 @@ impl GraphStore {
 
         Ok(())
     }
+
     pub fn load_or_new(db: &str, env: &str) -> Self {
         let dummy = GraphStore::new();
         let storage_dir = dummy.get_secure_storage_dir(db, env);
@@ -95,8 +131,12 @@ impl GraphStore {
             GraphStore::new()
         }
     }
+
     pub fn deploy_to_remotes(&self, db: &str, env: &str) -> Result<(), String> {
         let dummy = GraphStore::new();
+        let home = std::env::var("HOME").expect("not unix");
+        let mut x = LOCAL_STORAGE.replace("%home%", &home);
+        x.push_str("/deploy.yml");
         let storage_dir = dummy.get_secure_storage_dir(db, env);
         let local_file = storage_dir.join(format!("{env}.ji"));
 
@@ -107,19 +147,7 @@ impl GraphStore {
             ));
         }
 
-        let config_path = storage_dir
-            .parent()
-            .unwrap()
-            .parent()
-            .unwrap()
-            .join("deploy.yaml");
-        if !config_path.exists() {
-            return Err(
-                "Fichier de configuration 'deploy.yaml' introuvable à la racine".to_string(),
-            );
-        }
-
-        let config_str = fs::read_to_string(config_path).map_err(|e| e.to_string())?;
+        let config_str = fs::read_to_string(x.as_str()).map_err(|e| e.to_string())?;
         let config: DeployConfig = serde_yaml::from_str(&config_str).map_err(|e| e.to_string())?;
 
         println!(

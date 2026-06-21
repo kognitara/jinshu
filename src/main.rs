@@ -12,18 +12,20 @@ mod token;
 mod vm;
 mod web;
 use crate::optimizer::QueryOptimizer;
-use crate::store::{GraphStore, LOCAL_STORAGE};
+use crate::store::{GraphStore, LOCAL_STORAGE, init_deploy_config};
+use axum::routing::put_service;
 use clap::{Arg, Command, value_parser};
 use codegen::CodeGenerator;
 use indicatif::{ProgressBar, ProgressStyle};
-use inquire::{MultiSelect, Text};
+use inquire::{Editor, MultiSelect, Text};
 use lexer::Lexer;
 use parser::Parser;
 use rustyline::DefaultEditor;
 use rustyline::error::ReadlineError;
 use std::env::current_dir;
 use std::ffi::OsString;
-use std::fs::{self, remove_dir_all};
+use std::fs::{self, File, read_to_string, remove_dir_all};
+use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::exit;
@@ -65,12 +67,25 @@ fn cli() -> Command {
         .subcommand(Command::new("rm").about("Remove selected databases"))
         .subcommand(
             Command::new("deploy")
-                .about("Deploy the database on servers")
-                .arg(Arg::new("db").required(true).help("Name of the database"))
-                .arg(
-                    Arg::new("env")
-                        .required(true)
-                        .help("Environnement (prod, tests)"),
+                .about("selected databases")
+                .subcommand(Command::new("edit"))
+                .subcommand(Command::new("init"))
+                .subcommand(
+                    Command::new("send")
+                        .arg(
+                            Arg::new("base")
+                                .short('b')
+                                .required(true)
+                                .long("base")
+                                .help("the base to send to remotes"),
+                        )
+                        .arg(
+                            Arg::new("env")
+                                .short('e')
+                                .required(true)
+                                .long("env")
+                                .help("the environement base to send to remotes"),
+                        ),
                 ),
         )
         .subcommand(
@@ -300,22 +315,44 @@ fn process_matches(matches: &clap::ArgMatches, total_start: &Instant) {
                 std::process::exit(1);
             }
         }
-        Some(("deploy", sub)) => {
-            let db = sub.get_one::<String>("db").unwrap();
-            let env = sub.get_one::<String>("env").unwrap();
-
-            let store = GraphStore::new();
-            if let Err(e) = store.deploy_to_remotes(db, env) {
-                eprintln!("\x1b[1;31mErreur de déploiement :\x1b[0m {e}");
-                std::process::exit(1);
+        Some(("deploy", sub)) => match sub.subcommand() {
+            Some(("init", _)) => {
+                init_deploy_config().expect("failed to init config");
             }
-        }
+            Some(("send", sub)) => {
+                let db = sub.get_one::<String>("base").unwrap();
+                let env = sub.get_one::<String>("env").unwrap();
+
+                let store = GraphStore::new();
+                if let Err(e) = store.deploy_to_remotes(db, env) {
+                    eprintln!("\x1b[1;31mErreur de déploiement :\x1b[0m {e}");
+                    std::process::exit(1);
+                }
+            }
+            Some(("edit", _)) => {
+                let home = std::env::var("HOME").expect("not unix");
+                let mut x = LOCAL_STORAGE.replace("%home%", &home);
+                x.push_str("/deploy.yml");
+                let old_content = read_to_string(x.as_str()).expect("failed to parse file content");
+                let new_content = Editor::new("Edit deploy config")
+                    .with_predefined_text(&old_content)
+                    .prompt()
+                    .expect("bad config");
+                let mut f = File::create(x.as_str()).expect("failed to erase content");
+                f.write_all(new_content.as_bytes())
+                    .expect("failed to write");
+                f.sync_all().expect("failed to save");
+            }
+            _ => {
+                cli().clone().print_help().expect("failed to print help");
+            }
+        },
         _ => {
             cli().clone().print_help().expect("failed to print help");
         }
     }
 }
-fn run_repl() {
+fn shell() {
     println!("╔══════════════════════════════════════════════════════╗");
     println!("║             Ji Interactive Shell Engine              ║");
     println!("║       Tapez 'exit' ou 'quit' pour quitter            ║");
@@ -587,7 +624,7 @@ fn main() {
     let matches = app.clone().get_matches();
     // Si aucune sous-commande n'est passée (ex: juste 'ji'), on lance le shell !
     if matches.subcommand_name().is_none() {
-        run_repl();
+        shell();
     } else {
         process_matches(&matches, &total_start);
     }
