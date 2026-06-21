@@ -1,6 +1,7 @@
 mod ast;
 mod bytecode;
 mod codegen;
+mod crypto;
 mod db;
 mod lexer;
 mod optimizer;

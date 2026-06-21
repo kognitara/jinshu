@@ -16,6 +16,6 @@ RestartSec=3s
 # Force la sortie standard directement dans le journal pour journalctl
 StandardOutput=journal
 StandardError=journal
-
+LoadCredential=master_seed:/etc/jinshu/seed.txt
 [Install]
 WantedBy=default.target

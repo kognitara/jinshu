@@ -1,3 +1,10 @@
+use crate::crypto::{chiffrer_aes_256, derive_master_key};
+use crate::web::DatabaseError;
+use aes_gcm::aead::AeadCore;
+use aes_gcm::{
+    Aes256Gcm, Key, Nonce,
+    aead::{Aead, KeyInit, OsRng},
+};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::{self, File};
@@ -5,8 +12,6 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use walkdir::WalkDir;
-
-use crate::web::DatabaseError;
 const GREEN: &str = "\x1b[32m";
 const RESET: &str = "\x1b[0m";
 
@@ -313,6 +318,7 @@ impl GraphStore {
             }
         }
     }
+
     /// Sauvegarde atomique avec Magic Number, compression Zstd, Bincode,
     /// gestion de l'historique dans snapshots/, et empilement (Push) dans ROLLBACK.
     pub fn save_to_disk(&self, db_name: &str, env: &str) -> Result<(), String> {
@@ -333,10 +339,37 @@ impl GraphStore {
             storage_dir
         );
 
-        // 1. Sérialisation bincode + compression Zstd en mémoire vive
+        // 1. Ton code actuel (Parfait)
         let mut encoder = zstd::Encoder::new(Vec::new(), 3).map_err(|e| e.to_string())?;
         bincode::serialize_into(&mut encoder, &self).map_err(|e| e.to_string())?;
         let compressed_bytes = encoder.finish().map_err(|e| e.to_string())?;
+        let secret_key: [u8; 32] = derive_master_key().expect("no key");
+
+        // 2. Chiffrement (Exemple AES-256-GCM)
+        // (Il faudra dériver une clé secrète, on gérera ça au propre)
+        let cipher_text =
+            chiffrer_aes_256(&compressed_bytes, &secret_key).expect("failed to chiffre");
+
+        // 3. Empreinte BLAKE3 (Sur le fichier final chiffré)
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(&MAGIC_NUMBER);
+        hasher.update(&cipher_text);
+        let hash_signature = hasher.finalize();
+
+        // --- 💾 ÉCRITURE DISQUE MODIFIÉE ---
+
+        let mut tmp_file = std::fs::File::create(&tmp_path).map_err(|e| e.to_string())?;
+
+        // On écrit la signature, puis les données chiffrées
+        tmp_file
+            .write_all(&MAGIC_NUMBER)
+            .map_err(|e| e.to_string())?;
+        tmp_file
+            .write_all(hash_signature.as_bytes())
+            .map_err(|e| e.to_string())?; // NOUVEAU
+        tmp_file
+            .write_all(&cipher_text)
+            .map_err(|e| e.to_string())?; // MODIFIÉ
 
         // 2. Écriture atomique dans le fichier temporaire (.tmp)
         {
